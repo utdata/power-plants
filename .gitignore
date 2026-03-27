@@ -1,0 +1,21 @@
+# R
+.Rhistory
+.RData
+.Rproj.user/
+
+# Quarto
+*.html
+*_files/
+*.utf8.md
+*.knit.md
+_site/
+_book/
+
+# System
+.DS_Store
+
+.quarto/
+/interactive-data/
+/demographic-data/
+/mapping-data/
+/plant-data/

@@ -1,0 +1,25 @@
+---
+title: "Data mapping"
+---
+
+## Goals of this notebook
+
+I want to map the demographic data we found and cleaned in the first notebook. This will adjust as time goes on, but this is the main focus for now.
+
+I am following a tutorial from [here](https://rfortherestofus.com/courses/mapping/lessons/welcome-to-mapping-with-r).
+
+## Setup
+
+I am setting up the packages I need.
+
+```{r}
+library(leaflet)
+library(tidyverse)
+library(tidycensus)
+library(janitor)
+library(tigris)
+library(scales)
+library(sf)
+library(tmap)
+library(shiny)
+```

@@ -1,0 +1,7 @@
+---
+title: "Power plants and underserved communities"
+---
+
+This is a project that is part of my work as a data fellow with MIG at the University of Texas at Austin.
+
+This will be a study of [power plant location trends] and their effects on the communities surrounding them, which tend to be low-income and/or majority BIPOC. The project will have data compiled from the Census, among other sources.

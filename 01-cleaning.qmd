@@ -1,0 +1,232 @@
+---
+title: "Data import and cleaning"
+---
+
+This notebook is the starting point for the power plants data project. I aim to focus on how the location of power plants in Texas intersect with the community and population that pre-exist in the area. Demographic data will be pulled from the [Texas Demographics Center](https://demographics.texas.gov/Estimates/#FAQ) (specifically age, sex and race/ethnicity for state and counties) and [US Department of Agriculture](https://data.ers.usda.gov/reports.aspx?ID=4038).
+
+## Setup
+
+Setting up the packages that will be used in this notebook.
+
+```{r}
+#| message: FALSE
+
+library(tidyverse)
+library(janitor)
+library(tidycensus)
+library(sf)
+```
+
+Activating my Census API key.
+
+```{r}
+census_api_key("460e8dedb542f01b4ea4adede880098417e04166")
+```
+
+
+## Importing files
+
+### Race
+
+Starting off with race data, taken from TDC.
+
+```{r}
+race_pop_raw <-
+  read_csv("demographic-data/race-pop.csv")
+
+race_pop_raw
+```
+
+I am only interested in the total of each demographic group in the counties. I also want the most recent data from 2024, but do note that they are estimates so they are not as accurate as the Census data would be.
+
+### Income
+
+Now importing median household income from USDA. Noting that I edited this file in Excel myself. I got rid of style additions, spaces and fixed the county column to fit R's needs.
+
+
+```{r}
+income_raw <-
+  read_csv("demographic-data/UnemploymentReport.csv")
+
+income_raw
+```
+
+I am only interested in the median income and the counties, so I will be cleaning for that. These two rows are also characters instead of numeric, so I will need to fix that before doing anything with the data set. The years in the data above are unemployment rates since this data is taken from the unemployment data for Texas.
+
+## Cleaning up through filter and select
+
+### Race
+
+The race population data is quite large, so I am going to filter the data for what I want (total of ethnic/racial groups, counties) and see how to make it more digestible. Note this data is from July 2024 and these are estimates for the population.
+
+```{r}
+race_pop_cleaned <- race_pop_raw |> 
+    filter(Age == "All Ages",
+           Year == "202407") |> 
+  select(Areaname,
+         Total,
+         NH_White_Total,
+         NH_Black_Total,
+         NH_Asian_Total,
+         NH_Other_Total,
+         Hispanic_Total) |> 
+  rename("Area" = "Areaname",
+         "NH_White" = "NH_White_Total",
+         "NH_Black" = "NH_Black_Total",
+         "NH_Asian" = "NH_Asian_Total",
+         "NH_Other" = "NH_Other_Total",
+         "Hispanic"= "Hispanic_Total") |>  filter(!Area == "TEXAS")
+
+race_pop_cleaned
+```
+
+
+
+### Income
+
+Now that our race population is clean, we are gonna tackle our median income data. Note that the median household income is from 2022.
+
+
+```{r}
+income_cleaned <- income_raw |> 
+  select(Area,
+         median_house_income_22,
+         perc_of_state_income) |> 
+  rename("Median_HH_Income" = "median_house_income_22",
+         "State_HH_Inc_Percent" = "perc_of_state_income") |> 
+  filter(!Area == "TEXAS")
+
+income_cleaned
+```
+
+## Getting geometry to use for mapping
+
+Getting the data needed to successfully map this. Trial and error.
+
+```{r}
+counties_map <-
+  read_sf("mapping-data/Texas_County_Boundaries_-2028607862104916578.geojson") |> 
+  arrange(CNTY_NM) |> 
+  select(CNTY_NM,
+         geometry) |> 
+  rename("Area" = "CNTY_NM") |> 
+  mutate(Area = str_c(Area, "County", sep = " "),
+         Area = toupper(Area))
+
+counties_map
+```
+
+```{r}
+tx <- read_sf("mapping-data/Texas_State_Boundary_1106215059088919288.geojson")
+
+tx
+```
+
+```{r}
+race_counties_joined <- race_pop_cleaned |> 
+  inner_join(counties_map, by = "Area")
+
+race_counties_joined
+```
+
+```{r}
+race_counties_joined |> 
+  write_sf("interactive-data/race_counties.geojson")
+```
+
+```{r}
+counties_map |> 
+  write_sf("interactive-data/counties_map.geojson")
+```
+
+Joining income data with the location data.
+
+```{r}
+income_counties_joined <- income_cleaned |> 
+  inner_join(counties_map, by = "Area")
+
+income_counties_joined
+```
+
+```{r}
+income_counties_joined |> 
+  write_sf("interactive-data/income_counties.geojson")
+```
+
+## Plant locations
+
+Found a database of plant locations. I will import and clean it up here.
+
+### Importing files
+
+These were compiled from [Oil and Gas Watch](https://oilandgaswatch.org/summary?facilitiesAndOrPipelines=Facilities+Only&state=TX). I downloaded the database, but it includes all states and several miscellaneous pieces of information.
+
+```{r}
+plant_raw_data <- read_csv("plant-data/plant-projects-all.csv")
+
+plant_raw_data
+```
+
+### Cleaning plant data
+
+Now that it is imported, we can clean it up for the data we want.
+
+```{r}
+plant_clean <- plant_raw_data |> 
+  filter(State == "TX") |> 
+  select(Area,
+         Company,
+         Project,
+         Status,
+         Classification,
+         Industry,
+         Type,
+         Latitude,
+         Longitude) |> 
+  mutate(Area = toupper(Area)) |> 
+  arrange(Area)
+
+plant_clean
+```
+
+Note: I noticed that some entries have multiple counties, so I went in Excel and cleaned them there because I wasn't sure how to do this on R. I also removed any projects that did not have assigned counties yet. This could've been easier through OpenRefine, but I forgot to use it.
+
+### Export
+
+Exporting to turn into a sf object.
+
+```{r}
+plant_clean |> 
+  write_csv("interactive-data/tx-plant-data.csv")
+```
+
+```{r}
+plant_clean |> 
+  write_rds("interactive-data/tx-plants-data.rds")
+```
+
+
+### SF object and exporting
+
+Turning the csv file into an sf object and exporting it.
+
+```{r}
+tx_plant_data <- read_csv("interactive-data/tx-plant-data.csv")
+```
+
+```{r}
+tx_plant_data_sf <- tx_plant_data |> 
+  st_as_sf(
+    coords = c("Longitude", "Latitude"),
+    crs = 4326
+  )
+```
+
+Note: This kept giving me an error, so it meant there were missing coordinates that I did not see. I went back in and manually added the coordinates for whatever I could find. I made a list of projects I did not find, which usually meant they lost funding, do not have a specific location yet and other factors.
+
+Now, I am exporting it.
+
+```{r}
+tx_plant_data_sf |> write_sf("interactive-data/tx-plants-data.geojson")
+```
+

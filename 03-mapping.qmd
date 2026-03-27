@@ -1,0 +1,772 @@
+---
+title: "Data mapping"
+---
+
+## Goals of this notebook
+
+I want to map the demographic data we found and cleaned in the first notebook. This will adjust as time goes on, but this is the main focus for now.
+
+I am following a tutorial from [here](https://rfortherestofus.com/courses/mapping/lessons/welcome-to-mapping-with-r).
+
+## Setup
+
+I am setting up the packages I need.
+
+```{r}
+library(leaflet)
+library(tidyverse)
+library(tidycensus)
+library(janitor)
+library(tigris)
+library(scales)
+library(sf)
+library(tmap)
+library(shiny)
+```
+
+## Getting the map started
+
+Importing the data.
+
+```{r}
+counties_map <- read_sf("interactive-data/race_counties.geojson")
+
+counties_map
+```
+
+```{r}
+counties_map_wgs84 <-
+  counties_map |> st_transform(crs = 4326)
+```
+
+
+```{r}
+# leaflet() |> 
+#   addTiles("CartoDB.Positron", group = "Map") |> 
+#   addPolygons(data = counties_map_wgs84,
+#               weight = 0.2,
+#               color = "purple",
+#               group = "Race") |> 
+#   addLayersControl(
+#     baseGroups = "Map",
+#     overlayGroups = "Race"
+#   )
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+## Non-white category
+
+Going to create a category that adds up Black, Asian and Hispanic populations and make that into a choropelth map.
+
+```{r}
+nw_counties_map <- counties_map_wgs84 |> 
+  mutate(BIPOC_Pop = NH_Black + NH_Asian + NH_Other + Hispanic)
+
+nw_counties_map
+```
+
+Now making the map.
+
+```{r}
+# my_palette <-
+#   colorNumeric(
+#     palette = "viridis",
+#     domain = nw_counties_map$BIPOC_Pop
+#   )
+```
+
+```{r}
+# leaflet() |> 
+#   addProviderTiles("CartoDB.Positron") |> 
+#   addPolygons(
+#     data = nw_counties_map,
+#     fillColor = ~my_palette(BIPOC_Pop),
+#     fillOpacity = 0.8,
+#     color = "white",
+#     weight = 0.75,
+#     label = ~BIPOC_Pop
+#   )
+```
+
+Not sure how much I like that, so I will come back to it after trying other options. First, I want to try adding labels, though.
+
+```{r}
+nw_counties_map_labels <- nw_counties_map |>
+  mutate(
+    text_label = str_glue(
+      "{BIPOC_Pop} of {Total} are considered as BIPOC in {Area}"
+    )
+  )
+```
+Making it into a map.
+
+```{r}
+# leaflet() |> 
+#   addProviderTiles("CartoDB.Positron") |> 
+#   addPolygons(
+#     data = nw_counties_map_labels,
+#     fillColor = ~my_palette(BIPOC_Pop),
+#     fillOpacity = 0.8,
+#     color = "white",
+#     weight = 0.75,
+#     popup = ~text_label
+#   )
+```
+
+I don't like that either. Solution is to make it into a percentage, but I would have to double check what classifies as other first before going ahead. For now, I'm moving on.
+
+## Dot/bubble map
+
+Creating a bubble map.
+
+```{r}
+# leaflet() |> 
+#   addProviderTiles("CartoDB.Positron") |> 
+#   addCircles(
+#     data = nw_counties_map,
+#     label = ~BIPOC_Pop,
+#     stroke = FALSE,
+#     fillOpacity = 0.5,
+#     radius = ~ Total / 100
+#   )
+```
+
+Can't find a reason for the error, will come back to this later.
+
+## Interactive map
+
+Using [this](https://walker-data.com/census-r/mapping-census-data-with-r.html#choropleth-maps-with-tmap) as a guide.
+
+```{r}
+# groups <- nw_counties_map |> 
+#   c("Hispanic", "NH_White", "NH_Black", "NH_Asian", "NH_Other")
+# ```
+# 
+# 
+# ```{r}
+# dropdown <- fluidPage(
+#   sidebarLayout(
+#     sidebarPanel(
+#       selectInput(
+#         inputId = "group",
+#         label = "Select a group",
+#         chpices = groups
+#       )
+#     ),
+#     mainPanel(
+#       leafletOutput("map", height = "600")
+#     )
+#   )
+# )
+```
+
+## Four different maps
+
+Making four different interactive maps for the different populations. Important note that the races are mutually exclusive groups and non-Hispanic other consists of individuals such as Alaska and American Natives, Pacific Islanders and all people listing two or more races, according to the Texas Demographic Center.
+
+### Black population
+
+Starting with Black population of Texas.
+
+```{r}
+black_map <- counties_map |> 
+  mutate(nh_black_pct = NH_Black / Total) |>
+  select(Area, nh_black_pct)
+
+black_map
+```
+
+Making the map.
+
+```{r}
+black_map |> 
+  shift_geometry() |> 
+  ggplot() +
+  geom_sf(
+    aes(
+      fill = nh_black_pct,
+      color = nh_black_pct
+    )
+  ) +
+  theme_void() +
+  theme(
+    legend.position = "top",
+    legend.key.width = unit(2, "cm"),
+    legend.key.height = unit(0.5, "cm"),
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold",
+      size = 16,
+      margin = margin(
+        b =0.25,
+        unit = "cm"
+      )
+    )
+  ) +
+  scale_fill_viridis_c(limits = c(0,1),
+                       labels = percent_format()) +
+scale_color_viridis_c(limits = c(0,1),
+                     labels = percent_format()) +
+  labs(
+    fill = NULL,
+    color = NULL,
+    title = "Percentage of Black Population Estimates for Texas Counties"
+  )
+```
+
+Making an interactive version.
+
+```{r}
+black_map_labels <- black_map |> 
+  mutate(text_label = str_glue(
+    "<b>{percent(nh_black_pct, accuracy = 0.1)}</b> of the population of <b>{Area}</b> identifies as Black"
+  ))
+```
+
+
+```{r}
+my_palette_1 <- colorNumeric(
+  palette = "viridis",
+  domain = black_map_labels$nh_black_pct
+)
+```
+
+```{r}
+leaflet() |> 
+  addProviderTiles("CartoDB.Positron") |> 
+  addPolygons(
+    data = black_map_labels,
+    weight = 0.75,
+    fillColor = ~my_palette_1(nh_black_pct),
+    fillOpacity = 0.8,
+    color = "white",
+    popup = ~text_label
+  ) |> 
+  addLegend(
+    position = "topright",
+    pal = my_palette_1,
+    values = black_map_labels$nh_black_pct,
+    labFormat = labelFormat(
+      transform = function(x) sort(x * 100),
+      suffix = "%"
+    ),
+    opacity = 0.8
+  )
+```
+
+
+### Asian population
+
+Now, doing the same for Asian population.
+
+```{r}
+asian_map <- counties_map |> 
+  mutate(nh_asian_pct = NH_Asian / Total) |>
+  select(Area, nh_asian_pct)
+
+asian_map
+```
+
+Making the map.
+
+```{r}
+asian_map |> 
+  shift_geometry() |> 
+  ggplot() +
+  geom_sf(
+    aes(
+      fill = nh_asian_pct,
+      color = nh_asian_pct
+    )
+  ) +
+  theme_void() +
+  theme(
+    legend.position = "top",
+    legend.key.width = unit(2, "cm"),
+    legend.key.height = unit(0.5, "cm"),
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold",
+      size = 16,
+      margin = margin(
+        b =0.25,
+        unit = "cm"
+      )
+    )
+  ) +
+  scale_fill_viridis_c(limits = c(0,1),
+                       labels = percent_format()) +
+scale_color_viridis_c(limits = c(0,1),
+                     labels = percent_format()) +
+  labs(
+    fill = NULL,
+    color = NULL,
+    title = "Percentage of Asian Population Estimates for Texas Counties"
+  )
+```
+
+Making an interactive version.
+
+```{r}
+asian_map_labels <- asian_map |> 
+  mutate(text_label = str_glue(
+    "<b>{percent(nh_asian_pct, accuracy = 0.1)}</b> of the population of <b>{Area}</b> identifies as Asian"
+  ))
+```
+
+
+```{r}
+my_palette_2 <- colorNumeric(
+  palette = "viridis",
+  domain = asian_map_labels$nh_asian_pct
+)
+```
+
+```{r}
+leaflet() |> 
+  addProviderTiles("CartoDB.Positron") |> 
+  addPolygons(
+    data = asian_map_labels,
+    weight = 0.75,
+    fillColor = ~my_palette_2(nh_asian_pct),
+    fillOpacity = 0.8,
+    color = "white",
+    popup = ~text_label
+  ) |> 
+  addLegend(
+    position = "topright",
+    pal = my_palette_2,
+    values = asian_map_labels$nh_asian_pct,
+    labFormat = labelFormat(
+      transform = function(x) sort(x * 100),
+      suffix = "%"
+    ),
+    opacity = 0.8
+  )
+```
+
+### Hispanic
+
+Applying same Process for Hispanic population.
+
+```{r}
+hispanic_map <- counties_map |> 
+  mutate(hispanic_pct = Hispanic / Total) |>
+  select(Area, hispanic_pct)
+
+hispanic_map
+```
+
+Making the map.
+
+```{r}
+hispanic_map |> 
+  shift_geometry() |> 
+  ggplot() +
+  geom_sf(
+    aes(
+      fill = hispanic_pct,
+      color = hispanic_pct
+    )
+  ) +
+  theme_void() +
+  theme(
+    legend.position = "top",
+    legend.key.width = unit(2, "cm"),
+    legend.key.height = unit(0.5, "cm"),
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold",
+      size = 16,
+      margin = margin(
+        b =0.25,
+        unit = "cm"
+      )
+    )
+  ) +
+  scale_fill_viridis_c(limits = c(0,1),
+                       labels = percent_format()) +
+scale_color_viridis_c(limits = c(0,1),
+                     labels = percent_format()) +
+  labs(
+    fill = NULL,
+    color = NULL,
+    title = "Percentage of Hispanic Population Estimates for Texas Counties"
+  )
+```
+
+Making an interactive version.
+
+```{r}
+hispanic_map_labels <- hispanic_map |> 
+  mutate(text_label = str_glue(
+    "<b>{percent(hispanic_pct, accuracy = 0.1)}</b> of the population of <b>{Area}</b> identifies as Hispanic"
+  ))
+```
+
+
+```{r}
+my_palette_3 <- colorNumeric(
+  palette = "viridis",
+  domain = hispanic_map_labels$hispanic_pct
+)
+```
+
+```{r}
+leaflet() |> 
+  addProviderTiles("CartoDB.Positron") |> 
+  addPolygons(
+    data = hispanic_map_labels,
+    weight = 0.75,
+    fillColor = ~my_palette_3(hispanic_pct),
+    fillOpacity = 0.8,
+    color = "white",
+    popup = ~text_label
+  ) |> 
+  addLegend(
+    position = "topright",
+    pal = my_palette_3,
+    values = hispanic_map_labels$hispanic_pct,
+    labFormat = labelFormat(
+      transform = function(x) sort(x * 100),
+      suffix = "%"
+    ),
+    opacity = 0.8
+  )
+```
+
+### Other
+
+Finishing it off with other population, which, as mentioned above, includes Native Americans and people with multiple races.
+
+```{r}
+other_map <- counties_map |> 
+  mutate(other_pct = NH_Other / Total) |>
+  select(Area, other_pct)
+
+other_map
+```
+
+Making the map.
+
+```{r}
+other_map |> 
+  shift_geometry() |> 
+  ggplot() +
+  geom_sf(
+    aes(
+      fill = other_pct,
+      color = other_pct
+    )
+  ) +
+  theme_void() +
+  theme(
+    legend.position = "top",
+    legend.key.width = unit(2, "cm"),
+    legend.key.height = unit(0.5, "cm"),
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold",
+      size = 16,
+      margin = margin(
+        b =0.25,
+        unit = "cm"
+      )
+    )
+  ) +
+  scale_fill_viridis_c(limits = c(0,1),
+                       labels = percent_format()) +
+scale_color_viridis_c(limits = c(0,1),
+                     labels = percent_format()) +
+  labs(
+    fill = NULL,
+    color = NULL,
+    title = "Percentage of Individuals Identifying as Other Estimates for Texas Counties"
+  )
+```
+
+Making an interactive version.
+
+```{r}
+other_map_labels <- other_map |> 
+  mutate(text_label = str_glue(
+    "<b>{percent(other_pct, accuracy = 0.1)}</b> of the population of <b>{Area}</b> identifies as Other"
+  ))
+```
+
+
+```{r}
+my_palette_4 <- colorNumeric(
+  palette = "viridis",
+  domain = other_map_labels$other_pct
+)
+```
+
+```{r}
+leaflet() |> 
+  addProviderTiles("CartoDB.Positron") |> 
+  addPolygons(
+    data = other_map_labels,
+    weight = 0.75,
+    fillColor = ~my_palette_4(other_pct),
+    fillOpacity = 0.8,
+    color = "white",
+    popup = ~text_label
+  ) |> 
+  addLegend(
+    position = "topright",
+    pal = my_palette_4,
+    values = other_map_labels$other_pct,
+    labFormat = labelFormat(
+      transform = function(x) sort(x * 100),
+      suffix = "%"
+    ),
+    opacity = 0.8
+  )
+```
+
+## Plant data
+
+Mapping the plant data as locations.
+
+Starting out with a static map.
+
+```{r}
+plants_map <- read_sf("interactive-data/tx-plants-data.geojson")
+
+plants_map
+```
+
+```{r}
+texas <- map_data('county', region = 'texas')
+
+texas
+```
+
+```{r}
+tx_plants <- read_rds("interactive-data/tx-plants-data.rds")
+```
+
+```{r}
+texas_map <- ggplot(data = texas) +
+  geom_polygon(aes(x = long, y = lat, group = group), fill = "white", color = "black") +
+  coord_fixed(1.3)
+
+texas_map
+```
+
+```{r}
+texas_map +
+  geom_point(data = tx_plants, aes(x = Longitude, y = Latitude), color = "blue", size = 0.75) +
+  theme_void()
+```
+
+Done with static, making an interactive version.
+
+```{r}
+plants_map_labels <- plants_map |> 
+  mutate(text_label = str_glue(
+    "{Project} developed by {Company}"
+  ))
+```
+
+
+```{r}
+leaflet() |> 
+  addProviderTiles("CartoDB.Positron") |> 
+  addCircles(
+    data = plants_map_labels,
+    fillColor = "blue",
+    stroke = FALSE,
+    radius = 500,
+    fillOpacity = 1,
+    popup = ~text_label
+  ) 
+```
+
+## Adding both sets of data on a map
+
+### Black population
+
+```{r}
+leaflet() |> 
+   addProviderTiles("CartoDB.Positron") |> 
+  addPolygons(
+    data = black_map_labels,
+    weight = 0.75,
+    fillColor = ~my_palette_1(nh_black_pct),
+    fillOpacity = 0.8,
+    color = "white",
+    popup = ~text_label
+  ) |> 
+  addLegend(
+    position = "topright",
+    pal = my_palette_1,
+    values = black_map_labels$nh_black_pct,
+    labFormat = labelFormat(
+      transform = function(x) sort(x * 100),
+      suffix = "%"
+    ),
+    opacity = 0.8
+  ) |> 
+  addCircles(
+    data = plants_map_labels,
+    fillColor = "red",
+    stroke = FALSE,
+    radius = 500,
+    fillOpacity = 1,
+    popup = ~text_label
+  ) 
+```
+
+
+### Asian population
+
+```{r}
+leaflet() |> 
+  addProviderTiles("CartoDB.Positron") |> 
+  addPolygons(
+    data = asian_map_labels,
+    weight = 0.75,
+    fillColor = ~my_palette_2(nh_asian_pct),
+    fillOpacity = 0.8,
+    color = "white",
+    popup = ~text_label
+  ) |> 
+  addLegend(
+    position = "topright",
+    pal = my_palette_2,
+    values = asian_map_labels$nh_asian_pct,
+    labFormat = labelFormat(
+      transform = function(x) sort(x * 100),
+      suffix = "%"
+    ),
+    opacity = 0.8
+  ) |> 
+  addCircles(
+    data = plants_map_labels,
+    fillColor = "red",
+    stroke = FALSE,
+    radius = 500,
+    fillOpacity = 1,
+    popup = ~text_label
+  ) 
+```
+
+### Hispanic population
+
+```{r}
+leaflet() |> 
+  addProviderTiles("CartoDB.Positron") |> 
+  addPolygons(
+    data = hispanic_map_labels,
+    weight = 0.75,
+    fillColor = ~my_palette_3(hispanic_pct),
+    fillOpacity = 0.8,
+    color = "white",
+    popup = ~text_label
+  ) |> 
+  addLegend(
+    position = "topright",
+    pal = my_palette_3,
+    values = hispanic_map_labels$hispanic_pct,
+    labFormat = labelFormat(
+      transform = function(x) sort(x * 100),
+      suffix = "%"
+    ),
+    opacity = 0.8
+  ) |> 
+  addCircles(
+    data = plants_map_labels,
+    fillColor = "red",
+    stroke = FALSE,
+    radius = 500,
+    fillOpacity = 1,
+    popup = ~text_label
+  ) 
+```
+
+
+### Other population
+
+```{r}
+leaflet() |> 
+  addProviderTiles("CartoDB.Positron") |> 
+  addPolygons(
+    data = other_map_labels,
+    weight = 0.75,
+    fillColor = ~my_palette_4(other_pct),
+    fillOpacity = 0.8,
+    color = "white",
+    popup = ~text_label
+  ) |> 
+  addLegend(
+    position = "topright",
+    pal = my_palette_4,
+    values = other_map_labels$other_pct,
+    labFormat = labelFormat(
+      transform = function(x) sort(x * 100),
+      suffix = "%"
+    ),
+    opacity = 0.8
+  ) |> 
+  addCircles(
+    data = plants_map_labels,
+    fillColor = "red",
+    stroke = FALSE,
+    radius = 500,
+    fillOpacity = 1,
+    popup = ~text_label
+  ) 
+```
+
+### Income
+
+```{r}
+tx_income <- read_sf("interactive-data/income_counties.geojson")
+```
+
+```{r}
+tx_income_labels <- tx_income |> 
+  mutate(text_label = str_glue(
+    "The median income in {Area} is {Median_HH_Income}"
+  ))
+```
+
+
+```{r}
+my_palette_5 <- colorNumeric(
+  palette = "viridis",
+  domain = tx_income_labels$State_HH_Inc_Percent
+)
+```
+
+```{r}
+leaflet() |> 
+  addProviderTiles("CartoDB.Positron") |> 
+  addPolygons(
+    data = black_map_labels,
+    weight = 0.75,
+    fillColor = ~my_palette_1(nh_black_pct),
+    fillOpacity = 0.8,
+    color = "white",
+    popup = ~text_label
+  ) |> 
+  addLegend(
+    position = "topright",
+    pal = my_palette_1,
+    values = black_map_labels$nh_black_pct,
+    labFormat = labelFormat(
+      transform = function(x) sort(x * 100),
+      suffix = "%"
+    ),
+    opacity = 0.8
+  )
+```

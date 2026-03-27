@@ -1,0 +1,10 @@
+---
+title: "Data analysis"
+format: html
+---
+
+## Goals of this notebook
+
+I will explore more of the data that I downloaded, such as the median income of these counties.
+
+These are some questions I'm hoping to answer:
