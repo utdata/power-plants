@@ -8,3 +8,351 @@ format: html
 I will explore more of the data that I downloaded, such as the median income of these counties.
 
 These are some questions I'm hoping to answer:
+
+*How much of the population is considered BIPOC in areas with the most plants?
+*How much of the population is considered low-income in areas with the most plants?
+*How does Texas' pollution change over time?
+
+This is a continuous list of questions that will expand as I find more interesting points of data.
+
+## Setup
+
+Setting up the packages that will be used in this notebook.
+
+```{r}
+#| message: FALSE
+
+library(tidyverse)
+library(janitor)
+library(patchwork)
+```
+
+## Import
+
+I am importing three sets of data: race, income and plant locations.
+
+### Race
+
+```{r}
+race <- read_rds("demographic-data/tx-race-data.rds")
+```
+
+
+### Income
+
+```{r}
+income_fix <- read_rds("demographic-data/tx-income-data.rds")
+```
+
+
+### Plants
+
+```{r}
+plants <- read_rds("interactive-data/tx-plants-data.rds")
+```
+
+## Total plants
+
+First, I want to find out how many plants there are in each county.
+
+```{r}
+plants_count <- plants |>
+  count(Area) |> 
+  rename("Number_of_projects" = "n") |> 
+  arrange(desc(Number_of_projects))
+
+plants_count
+```
+
+## Joining data
+
+Now that we have a count of all the projects done in specific areas, we can join the race and income data to the plants data.
+
+### Race
+
+```{r}
+race_plants <- race |> 
+  inner_join(plants_count, by = "Area")
+
+race_plants
+```
+
+### Income
+
+The income data actually has an issue I need to fix before anything: the income is a character instead of a number. I will take care of that before delving into joining.
+
+```{r}
+income <- income_fix |> 
+  mutate(across(c(Median_HH_Income, State_HH_Inc_Percent), parse_number)) |> 
+  select(Area,
+         Median_HH_Income)
+
+income
+```
+
+Note: HH stands for household
+
+Now, I will join this with the plant location data.
+
+```{r}
+income_plants <- income |> 
+  inner_join(plants_count, by = "Area")
+
+income_plants
+```
+
+## Race populations around plants
+
+Using percentages to see how many people of each race/ethnicity live around these plants.
+
+```{r}
+pop_around_plants <- race_plants |> 
+  mutate(White_Perc = ((NH_White / Total) * 100) |> round_half_up(),
+         Black_Perc = ((NH_Black / Total) * 100) |>  round_half_up(),
+         Asian_Perc = ((NH_Asian / Total) * 100) |>  round_half_up(),
+         Hispanic_Perc = ((Hispanic / Total) * 100) |> round_half_up(),
+         Others_Perc = ((NH_Other / Total) * 100) |>  round_half_up()) |> 
+  select(Area,
+         Number_of_projects,
+         White_Perc,
+         Black_Perc,
+         Asian_Perc,
+         Hispanic_Perc,
+         Others_Perc) |> 
+  arrange(desc(Number_of_projects))
+
+pop_around_plants
+```
+
+### Chart
+
+Narrowing it down to the top five counties with most projects.
+
+```{r}
+top_five_counties <- pop_around_plants |> 
+  filter(Number_of_projects >= 28)
+
+top_five_counties
+```
+
+Now pivoting longer.
+
+```{r}
+top_five_counties_long <- top_five_counties |> 
+  pivot_longer(
+    cols = "White_Perc":"Others_Perc",
+    names_to = "Population",
+    values_to = "Values"
+  ) |> 
+  select(Area,
+         Population,
+         Values)
+
+top_five_counties_long
+```
+
+Making it into a bar chart.
+
+```{r}
+top_five_counties_long |> 
+  ggplot(aes(x = Area, y = Values, fill = Population)) +
+  geom_col() +
+  labs(title = "Most of the counties with the highest number of petrochemical projects have a higher BIPOC population.",
+       subtitle = str_wrap("There are higher percentages of Black and Hispanic populations around heavily petrochemical areas. This likely leads to these populations experiencing a higher rate of damages that comes from petrochemical plants, such chemical runoffs in waterways and chemical leaks."),
+                           x = "County",
+                           y = "Population percentage")
+```
+
+### Findings
+
+With the exception of Chambers county, the other four counties had a higher population of Black, Asian, Hispanic or other identifying populations.
+
+## Income level around plants
+
+I will first create a new column that categorizes counties into above or below the Texas median household income. Median household income of Texas is $72,279, according to the same data set I got the rest of the income data from. I will also organize it.
+
+```{r}
+tx_income_lvl <- income_plants |> 
+  mutate(lvl_of_income = if_else(
+    Median_HH_Income > 72279,
+    "ABOVE",
+    "BELOW"
+  )) |> 
+  arrange(desc(Number_of_projects))
+
+tx_income_lvl
+```
+
+I also want to compare it to the national median household income. According to the [Census](https://www.census.gov/library/publications/2025/demo/p60-286.html), the median household income in the United States is $83,730.
+
+```{r}
+national_income_lvl <- income_plants |> 
+  mutate(lvl_of_income = if_else(
+    Median_HH_Income > 83730,
+    "ABOVE",
+    "BELOW"
+  )) |> 
+  arrange(desc(Number_of_projects))
+
+national_income_lvl
+```
+
+
+### Findings
+
+Focusing on the top five counties with the highest number of projects, Chambers and Brazoria earn higher than the median household income in both Texas and the U.S. The other three counties earn less than the median income, though.
+
+## Pollution
+
+### Air
+
+#### Importing
+
+Going to import my data first.
+
+```{r}
+air_pol_25 <- read_rds("pol-data/air_pol_25")
+```
+
+```{r}
+air_pol_15 <- read_rds("pol-data/air_pol_15")
+```
+
+```{r}
+air_pol_05 <- read_rds("pol-data/air_pol_05")
+```
+
+#### Renaming
+
+I forgot that the plants data has counties under area instead of county, so I am changing that here.
+
+```{r}
+air_pol_25r <- air_pol_25 |> 
+  rename("Area" = "County")
+
+air_pol_25r
+```
+
+```{r}
+air_pol_15r <- air_pol_15 |> 
+  rename("Area" = "County")
+
+air_pol_15r
+```
+
+```{r}
+air_pol_05r <- air_pol_05 |> 
+  rename("Area" = "County")
+
+air_pol_05r
+```
+
+#### Joining
+
+Now, I am going to join them with plants data.
+
+```{r}
+air_pol_25j <- air_pol_25r |> 
+  inner_join(plants_count, by = "Area") |> 
+  arrange(desc(Number_of_projects))
+
+air_pol_25j
+```
+
+```{r}
+air_pol_15j <- air_pol_15r |> 
+  inner_join(plants_count, by = "Area") |> 
+  arrange(desc(Number_of_projects))
+
+air_pol_15j
+```
+
+```{r}
+air_pol_05j <- air_pol_05r |> 
+  inner_join(plants_count, by = "Area") |> 
+  arrange(desc(Number_of_projects))
+
+air_pol_05j
+```
+
+#### Chart
+
+I feel like looking at this through the code isn't indicative enough, so I am going to chart them based on air quality and location. I am going to get the top counties then make them into a graph.
+
+First, I am getting the top 5 counties with most projects.
+
+```{r}
+top_five_areas_25 <- air_pol_25j |> 
+   filter(Number_of_projects >= 13)
+
+top_five_areas_25
+```
+
+```{r}
+top_five_areas_15 <- air_pol_15j |> 
+   filter(Number_of_projects >= 13)
+
+top_five_areas_15
+```
+
+```{r}
+top_five_areas_05 <- air_pol_05j |> 
+   filter(Number_of_projects >= 13)
+
+top_five_areas_05
+```
+
+Now, I will make three different charts.
+
+```{r}
+air_25 <- top_five_areas_25 |> 
+  ggplot(aes(x = reorder(Area, -Median_AQI), y = Median_AQI)) +
+  geom_col() +
+  labs(
+                           x = "County",
+                           y = "Median AQI")
+
+air_25
+```
+
+```{r}
+air_15 <- top_five_areas_15 |> 
+   ggplot(aes(x = reorder(Area, -Median_AQI), y = Median_AQI)) +
+  geom_col() +
+  labs(x = "County",
+                           y = "Median AQI")
+
+air_15
+```
+
+```{r}
+air_05 <- top_five_areas_05 |> 
+   ggplot(aes(x = reorder(Area, -Median_AQI), y = Median_AQI)) +
+  geom_col() +
+  labs(  x = "County",
+                           y = "Median AQI")
+
+air_05
+```
+
+Now, I want to put them side by side before writing my findings.
+
+```{r}
+combined <- air_25 + air_15 + air_05
+  
+
+combined
+```
+
+Annotating it slightly, keeping in mind I'm not sure how to clean up the counties.
+
+```{r}
+combined +
+  plot_annotation(
+    title = "Median Air Quality Index for the top five counties with the most petrochemical projects in 2025, 2015 and 2005"
+  )
+```
+
+#### Findings
+
+Number of petrochemical projects in counties may not entirely correlate with air quality, but industry in general tends to make it worse. In 2005, the median air quality was worse and saw improvements in 2015. However, it began to rise again in 2025.

@@ -1,0 +1,115 @@
+---
+title: "Texas power plants map"
+format: html
+---
+
+## Goals of this notebook
+
+I want to map the plant data I found and cleaned in the first notebook. 
+
+## Setup
+
+I am setting up the packages I need.
+
+```{r}
+library(leaflet)
+library(tidyverse)
+library(tidycensus)
+library(janitor)
+library(tigris)
+library(scales)
+library(sf)
+library(tmap)
+library(shiny)
+```
+
+## Getting the map started
+
+Importing the data that I cleaned in the cleaning notebook.
+
+```{r}
+counties_map <- read_sf("interactive-data/race_counties.geojson")
+
+counties_map
+```
+
+
+## Plant data
+
+Mapping the plant data as locations.
+
+Starting out with a static map.
+
+```{r}
+plants_map <- read_sf("interactive-data/tx-plants-data.geojson")
+
+plants_map
+```
+
+Using a package to import the geometry of the state of Texas to create the base of the static map.
+
+```{r}
+texas <- map_data('county', region = 'texas')
+
+texas
+```
+
+Importing the rds version of the Texas plants.
+
+```{r}
+tx_plants <- read_rds("interactive-data/tx-plants-data.rds")
+```
+
+## Static map
+
+Creating the static map.
+
+Starting out with the base layer.
+
+```{r}
+texas_map <- ggplot(data = texas) +
+  geom_polygon(aes(x = long, y = lat, group = group), fill = "white", color = "black") +
+  coord_fixed(1.3)
+
+texas_map
+```
+
+Putting the plant locations on the map.
+
+```{r}
+texas_map +
+  geom_point(data = tx_plants, aes(x = Longitude, y = Latitude), color = "blue", size = 0.75) +
+  theme_void()
+```
+
+## Interactive map
+
+Done with static, making an interactive version.
+
+Creating labels for the map.
+
+```{r}
+plants_map_labels <- plants_map |> 
+  mutate(text_label = str_glue(
+    "{Project} developed by {Company}"
+  ))
+```
+
+Creating the interactive map.
+
+```{r}
+leaflet() |> 
+  addProviderTiles("CartoDB.Positron") |> 
+  addCircleMarkers(
+    data = plants_map_labels,
+    fillColor = "blue",
+    stroke = FALSE,
+    radius = 3,
+    fillOpacity = 1,
+    popup = ~text_label
+  ) 
+
+```
+
+
+

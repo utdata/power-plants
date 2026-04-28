@@ -4,4 +4,16 @@ title: "Power plants and underserved communities"
 
 This is a project that is part of my work as a data fellow with MIG at the University of Texas at Austin.
 
-This will be a study of [power plant location trends] and their effects on the communities surrounding them, which tend to be low-income and/or majority BIPOC. The project will have data compiled from the Census, among other sources.
+This will be a study of power plant location trends and their effects on the communities surrounding them, which tend to be low-income and/or majority BIPOC. Resources of data can be found in the cleaning notebook, which list where every piece of information was derived from.
+
+## Background
+
+Texas’ petrochemical operations discharge tens of millions of pounds of toxic pollutants into the air each year, comprising almost one-fifth of toxic air releases in the United States. The state is also the nation’s top emitter of benzene, ethylene oxide and 1,3-butadiene. 
+
+In November 2025, Texas Southern University released a report noting that most proposed petrochemical plants are a few miles outside of vulnerable communities composed of people from disadvantaged socioeconomic backgrounds. Half of these communities also already rank among the worst in the nation for toxic air pollution. Oftentimes, companies propose the plants as an opportunity for jobs and prosperity. However, a study led by Tulane University found that people of color are underrepresented in the petrochemical industry, occupying 57% of lower-paying jobs while bearing the brunt of the pollution.
+
+Texas has led the nation from 2021 to 2023 in hazardous chemical incidents, including fires, explosions and toxic air releases. These incidents notably affect the Hispanic community at a higher likelihood due to the fact that an increasingly Latino population is living in fenceline communities — communities living within a mile or less radius of a chemical facility. Meanwhile, out of the 82 industrial facilities proposed statewide, 90% are located in counties with higher concentrations with people coming from disadvantaged backgrounds. 
+
+Neglect is coming from both a state and national level. Several attacks on EPA makes it difficult to realize the extent of the damage, as the Trump administration quietly took down a tool in early 2025 that tracked pollution, race, ethnicity and income. It does not help that Texas has a long history of pushing back against the EPA, citing economic disruption. The Houston-Galveston area, where around 50% of chemical incidents in 2023 occurred, has repeatedly violated ozone limits recommended by the EPA. Lack of action on both a federal and state level leads these communities to face increased risks of cancer and respiratory illnesses among residents, as exemplified by Louisiana’s Cancer Alley.
+
+## Findings

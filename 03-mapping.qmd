@@ -4,7 +4,7 @@ title: "Data mapping"
 
 ## Goals of this notebook
 
-I want to map the demographic data we found and cleaned in the first notebook. This will adjust as time goes on, but this is the main focus for now.
+I want to map the demographic data I found and cleaned in the first notebook.
 
 I am following a tutorial from [here](https://rfortherestofus.com/courses/mapping/lessons/welcome-to-mapping-with-r).
 
@@ -26,7 +26,7 @@ library(shiny)
 
 ## Getting the map started
 
-Importing the data.
+Importing the data that I cleaned in the cleaning notebook.
 
 ```{r}
 counties_map <- read_sf("interactive-data/race_counties.geojson")
@@ -34,42 +34,16 @@ counties_map <- read_sf("interactive-data/race_counties.geojson")
 counties_map
 ```
 
-```{r}
-counties_map_wgs84 <-
-  counties_map |> st_transform(crs = 4326)
-```
-
-
-```{r}
-# leaflet() |> 
-#   addTiles("CartoDB.Positron", group = "Map") |> 
-#   addPolygons(data = counties_map_wgs84,
-#               weight = 0.2,
-#               color = "purple",
-#               group = "Race") |> 
-#   addLayersControl(
-#     baseGroups = "Map",
-#     overlayGroups = "Race"
-#   )
-```
-
-
-```{r}
-```
-
-
-```{r}
-```
 
 ## Non-white category
 
 Going to create a category that adds up Black, Asian and Hispanic populations and make that into a choropelth map.
 
 ```{r}
-nw_counties_map <- counties_map_wgs84 |> 
-  mutate(BIPOC_Pop = NH_Black + NH_Asian + NH_Other + Hispanic)
-
-nw_counties_map
+# nw_counties_map <- counties_map_wgs84 |> 
+#   mutate(BIPOC_Pop = NH_Black + NH_Asian + NH_Other + Hispanic)
+# 
+# nw_counties_map
 ```
 
 Now making the map.
@@ -95,16 +69,21 @@ Now making the map.
 #   )
 ```
 
-Not sure how much I like that, so I will come back to it after trying other options. First, I want to try adding labels, though.
+I am not a fan of how that looks, so I am uncommenting the code.
+
+I am creating a labeled version to see how it would look.
+
+First, creating the labels.
 
 ```{r}
-nw_counties_map_labels <- nw_counties_map |>
-  mutate(
-    text_label = str_glue(
-      "{BIPOC_Pop} of {Total} are considered as BIPOC in {Area}"
-    )
-  )
+# nw_counties_map_labels <- nw_counties_map |>
+#   mutate(
+#     text_label = str_glue(
+#       "{BIPOC_Pop} of {Total} are considered as BIPOC in {Area}"
+#     )
+#   )
 ```
+
 Making it into a map.
 
 ```{r}
@@ -120,52 +99,8 @@ Making it into a map.
 #   )
 ```
 
-I don't like that either. Solution is to make it into a percentage, but I would have to double check what classifies as other first before going ahead. For now, I'm moving on.
+I don't think the labels make it better or more approachable. Uncommenting the code so it doesn't slow down the rest of the notebook.
 
-## Dot/bubble map
-
-Creating a bubble map.
-
-```{r}
-# leaflet() |> 
-#   addProviderTiles("CartoDB.Positron") |> 
-#   addCircles(
-#     data = nw_counties_map,
-#     label = ~BIPOC_Pop,
-#     stroke = FALSE,
-#     fillOpacity = 0.5,
-#     radius = ~ Total / 100
-#   )
-```
-
-Can't find a reason for the error, will come back to this later.
-
-## Interactive map
-
-Using [this](https://walker-data.com/census-r/mapping-census-data-with-r.html#choropleth-maps-with-tmap) as a guide.
-
-```{r}
-# groups <- nw_counties_map |> 
-#   c("Hispanic", "NH_White", "NH_Black", "NH_Asian", "NH_Other")
-# ```
-# 
-# 
-# ```{r}
-# dropdown <- fluidPage(
-#   sidebarLayout(
-#     sidebarPanel(
-#       selectInput(
-#         inputId = "group",
-#         label = "Select a group",
-#         chpices = groups
-#       )
-#     ),
-#     mainPanel(
-#       leafletOutput("map", height = "600")
-#     )
-#   )
-# )
-```
 
 ## Four different maps
 
@@ -175,6 +110,10 @@ Making four different interactive maps for the different populations. Important 
 
 Starting with Black population of Texas.
 
+#### Percentages
+
+Creating a column for the Black population percentage.
+
 ```{r}
 black_map <- counties_map |> 
   mutate(nh_black_pct = NH_Black / Total) |>
@@ -183,7 +122,9 @@ black_map <- counties_map |>
 black_map
 ```
 
-Making the map.
+#### Static
+
+Making a static map of the Black population in Texas.
 
 ```{r}
 black_map |> 
@@ -221,7 +162,11 @@ scale_color_viridis_c(limits = c(0,1),
   )
 ```
 
+#### Interactive
+
 Making an interactive version.
+
+Making the labels first.
 
 ```{r}
 black_map_labels <- black_map |> 
@@ -230,6 +175,7 @@ black_map_labels <- black_map |>
   ))
 ```
 
+Creating the color palette.
 
 ```{r}
 my_palette_1 <- colorNumeric(
@@ -237,6 +183,8 @@ my_palette_1 <- colorNumeric(
   domain = black_map_labels$nh_black_pct
 )
 ```
+
+Creating the map itself.
 
 ```{r}
 leaflet() |> 
@@ -266,6 +214,10 @@ leaflet() |>
 
 Now, doing the same for Asian population.
 
+#### Percentage
+
+Starting out with making a percentage of the Asian population in Texas.
+
 ```{r}
 asian_map <- counties_map |> 
   mutate(nh_asian_pct = NH_Asian / Total) |>
@@ -274,7 +226,9 @@ asian_map <- counties_map |>
 asian_map
 ```
 
-Making the map.
+#### Static
+
+Making the static map.
 
 ```{r}
 asian_map |> 
@@ -312,7 +266,11 @@ scale_color_viridis_c(limits = c(0,1),
   )
 ```
 
+#### Interactive
+
 Making an interactive version.
+
+Starting with making the labels.
 
 ```{r}
 asian_map_labels <- asian_map |> 
@@ -322,12 +280,17 @@ asian_map_labels <- asian_map |>
 ```
 
 
+Making a color palette.
+
 ```{r}
 my_palette_2 <- colorNumeric(
   palette = "viridis",
   domain = asian_map_labels$nh_asian_pct
 )
 ```
+
+
+Creating the map itself.
 
 ```{r}
 leaflet() |> 
@@ -356,6 +319,10 @@ leaflet() |>
 
 Applying same Process for Hispanic population.
 
+#### Percentage
+
+Starting with making the percentage of the Hispanic population in Texas.
+
 ```{r}
 hispanic_map <- counties_map |> 
   mutate(hispanic_pct = Hispanic / Total) |>
@@ -364,7 +331,9 @@ hispanic_map <- counties_map |>
 hispanic_map
 ```
 
-Making the map.
+#### Static
+
+Making the static map.
 
 ```{r}
 hispanic_map |> 
@@ -402,7 +371,11 @@ scale_color_viridis_c(limits = c(0,1),
   )
 ```
 
+#### Interactive
+
 Making an interactive version.
+
+Making the labels first.
 
 ```{r}
 hispanic_map_labels <- hispanic_map |> 
@@ -411,6 +384,7 @@ hispanic_map_labels <- hispanic_map |>
   ))
 ```
 
+Now creating a color palette.
 
 ```{r}
 my_palette_3 <- colorNumeric(
@@ -418,6 +392,8 @@ my_palette_3 <- colorNumeric(
   domain = hispanic_map_labels$hispanic_pct
 )
 ```
+
+Making the map itself.
 
 ```{r}
 leaflet() |> 
@@ -446,6 +422,10 @@ leaflet() |>
 
 Finishing it off with other population, which, as mentioned above, includes Native Americans and people with multiple races.
 
+#### Percentages
+
+Making the percentage of population that identifies as other in Texas.
+
 ```{r}
 other_map <- counties_map |> 
   mutate(other_pct = NH_Other / Total) |>
@@ -454,7 +434,9 @@ other_map <- counties_map |>
 other_map
 ```
 
-Making the map.
+#### Static
+
+Making the static map.
 
 ```{r}
 other_map |> 
@@ -492,7 +474,11 @@ scale_color_viridis_c(limits = c(0,1),
   )
 ```
 
+#### Interactive
+
 Making an interactive version.
+
+Making the labels first.
 
 ```{r}
 other_map_labels <- other_map |> 
@@ -501,6 +487,7 @@ other_map_labels <- other_map |>
   ))
 ```
 
+Creating a color palette.
 
 ```{r}
 my_palette_4 <- colorNumeric(
@@ -508,6 +495,8 @@ my_palette_4 <- colorNumeric(
   domain = other_map_labels$other_pct
 )
 ```
+
+Now making the map itself.
 
 ```{r}
 leaflet() |> 
@@ -544,15 +533,23 @@ plants_map <- read_sf("interactive-data/tx-plants-data.geojson")
 plants_map
 ```
 
+Using a package to import the geometry of the state of Texas to create the base of the static map.
+
 ```{r}
 texas <- map_data('county', region = 'texas')
 
 texas
 ```
 
+Importing the rds version of the Texas plants.
+
 ```{r}
 tx_plants <- read_rds("interactive-data/tx-plants-data.rds")
 ```
+
+Creating the static map.
+
+Starting out with the base layer.
 
 ```{r}
 texas_map <- ggplot(data = texas) +
@@ -562,6 +559,8 @@ texas_map <- ggplot(data = texas) +
 texas_map
 ```
 
+Putting the plant locations on the map.
+
 ```{r}
 texas_map +
   geom_point(data = tx_plants, aes(x = Longitude, y = Latitude), color = "blue", size = 0.75) +
@@ -570,6 +569,8 @@ texas_map +
 
 Done with static, making an interactive version.
 
+Creating labels for the map.
+
 ```{r}
 plants_map_labels <- plants_map |> 
   mutate(text_label = str_glue(
@@ -577,6 +578,7 @@ plants_map_labels <- plants_map |>
   ))
 ```
 
+Creating the interactive map.
 
 ```{r}
 leaflet() |> 
@@ -729,9 +731,21 @@ leaflet() |>
 
 ### Income
 
+Importing the median household income per county.
+
 ```{r}
 tx_income <- read_sf("interactive-data/income_counties.geojson")
 ```
+
+I know that some of the data is character instead of a number, so I am fixing that here.
+
+```{r}
+tx_income |> 
+  mutate(across(c(Median_HH_Income, State_HH_Inc_Percent), parse_number),
+         HH_Inc_Perc = State_HH_Inc_Percent / 100)
+```
+
+Now creating the labels for the map.
 
 ```{r}
 tx_income_labels <- tx_income |> 
@@ -740,33 +754,12 @@ tx_income_labels <- tx_income |>
   ))
 ```
 
+Creating the color palette now.
 
 ```{r}
 my_palette_5 <- colorNumeric(
   palette = "viridis",
-  domain = tx_income_labels$State_HH_Inc_Percent
+  domain = tx_income_labels$HH_Inc_Perc
 )
 ```
 
-```{r}
-leaflet() |> 
-  addProviderTiles("CartoDB.Positron") |> 
-  addPolygons(
-    data = black_map_labels,
-    weight = 0.75,
-    fillColor = ~my_palette_1(nh_black_pct),
-    fillOpacity = 0.8,
-    color = "white",
-    popup = ~text_label
-  ) |> 
-  addLegend(
-    position = "topright",
-    pal = my_palette_1,
-    values = black_map_labels$nh_black_pct,
-    labFormat = labelFormat(
-      transform = function(x) sort(x * 100),
-      suffix = "%"
-    ),
-    opacity = 0.8
-  )
-```

@@ -1,0 +1,154 @@
+---
+title: "Income in Texas map"
+format: html
+---
+
+## Goals of this notebook
+
+I want to map the demographic data about the Texans income I found and cleaned in the first notebook. 
+
+## Setup
+
+I am setting up the packages I need.
+
+```{r}
+library(leaflet)
+library(tidyverse)
+library(tidycensus)
+library(janitor)
+library(tigris)
+library(scales)
+library(sf)
+library(tmap)
+library(shiny)
+```
+
+## Getting the map started
+
+Importing the data that I cleaned in the cleaning notebook.
+
+```{r}
+counties_map <- read_sf("interactive-data/race_counties.geojson")
+
+counties_map
+```
+Importing the median household income per county.
+
+```{r}
+tx_income <- read_sf("interactive-data/income_counties.geojson")
+```
+
+I know that some of the data is character instead of a number, so I am fixing that here.
+
+```{r}
+income <- tx_income |> 
+  mutate(across(c(Median_HH_Income, State_HH_Inc_Percent), parse_number),
+         HH_Inc_Perc = State_HH_Inc_Percent / 100)
+
+income
+```
+
+## Interactive map
+
+Now creating the labels for the map.
+
+```{r}
+income_labels <- income |> 
+  mutate(text_label = str_glue(
+    "The median income in {Area} is {Median_HH_Income}"
+  ))
+```
+
+Creating the color palette now.
+
+```{r}
+my_palette_5 <- colorNumeric(
+  palette = "viridis",
+  domain = income_labels$HH_Inc_Perc
+)
+```
+
+Making an interactive map.
+
+```{r}
+leaflet() |> 
+  addProviderTiles("CartoDB.Positron") |> 
+  addPolygons(
+    data = income_labels,
+    weight = 0.75,
+    fillColor = ~my_palette_5(HH_Inc_Perc),
+    fillOpacity = 0.8,
+    color = "white",
+    popup = ~text_label
+  ) |> 
+  addLegend(
+    position = "topright",
+    pal = my_palette_5,
+    values = income_labels$HH_Inc_Perc,
+    labFormat = labelFormat(
+      transform = function(x) sort(x * 100),
+      suffix = "%"
+    ),
+    opacity = 0.8
+  )
+```
+
+Note: The percentages in this map refer to how much of Texas' median income a particular county is close to. For example, keeping in mind the median income in Texas is $72,279, Travis county is around 120% of the Texas median income, at $95,151. 
+
+## Income with plants
+
+### Plant data
+
+Getting the plant map here first.
+
+```{r}
+plants_map <- read_sf("interactive-data/tx-plants-data.geojson")
+
+plants_map
+```
+
+Then making the labels.
+
+```{r}
+plants_map_labels <- plants_map |> 
+  mutate(text_label = str_glue(
+    "{Project} developed by {Company}"
+  ))
+```
+
+### Map
+
+Now making the map.
+
+```{r}
+leaflet() |> 
+    addProviderTiles("CartoDB.Positron") |> 
+  addPolygons(
+    data = income_labels,
+    weight = 0.75,
+    fillColor = ~my_palette_5(HH_Inc_Perc),
+    fillOpacity = 0.8,
+    color = "white",
+    popup = ~text_label
+  ) |> 
+  addLegend(
+    position = "topright",
+    pal = my_palette_5,
+    values = income_labels$HH_Inc_Perc,
+    labFormat = labelFormat(
+      transform = function(x) sort(x * 100),
+      suffix = "%"
+    ),
+    opacity = 0.8
+  ) |> 
+  addCircleMarkers(
+    data = plants_map_labels,
+    fillColor = "red",
+    stroke = FALSE,
+    radius = 3,
+    fillOpacity = 1,
+    popup = ~text_label
+  ) 
+```
+
+

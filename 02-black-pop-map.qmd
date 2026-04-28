@@ -1,0 +1,191 @@
+---
+title: "Black population maps"
+format: html
+---
+
+## Goals of this notebook
+
+I want to map the demographic data about the Texas Black population I found and cleaned in the first notebook. 
+
+## Setup
+
+I am setting up the packages I need.
+
+```{r}
+library(leaflet)
+library(tidyverse)
+library(tidycensus)
+library(janitor)
+library(tigris)
+library(scales)
+library(sf)
+library(tmap)
+library(shiny)
+```
+
+## Getting the map started
+
+Importing the data that I cleaned in the cleaning notebook.
+
+```{r}
+counties_map <- read_sf("interactive-data/race_counties.geojson")
+
+counties_map
+```
+
+## Demographic maps
+
+### Percentages
+
+Creating a column for the Black population percentage.
+
+```{r}
+black_map <- counties_map |> 
+  mutate(nh_black_pct = NH_Black / Total) |>
+  select(Area, nh_black_pct)
+
+black_map
+```
+
+### Static 
+
+Making a static map of the Black population in Texas.
+
+```{r}
+black_map |> 
+  shift_geometry() |> 
+  ggplot() +
+  geom_sf(
+    aes(
+      fill = nh_black_pct,
+      color = nh_black_pct
+    )
+  ) +
+  theme_void() +
+  theme(
+    legend.position = "top",
+    legend.key.width = unit(2, "cm"),
+    legend.key.height = unit(0.5, "cm"),
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold",
+      size = 16,
+      margin = margin(
+        b =0.25,
+        unit = "cm"
+      )
+    )
+  ) +
+  scale_fill_viridis_c(limits = c(0,1),
+                       labels = percent_format()) +
+scale_color_viridis_c(limits = c(0,1),
+                     labels = percent_format()) +
+  labs(
+    fill = NULL,
+    color = NULL,
+    title = "Percentage of Black Population Estimates for Texas Counties"
+  )
+```
+
+### Interactive
+
+Making an interactive version.
+
+Making the labels first.
+
+```{r}
+black_map_labels <- black_map |> 
+  mutate(text_label = str_glue(
+    "<b>{percent(nh_black_pct, accuracy = 0.1)}</b> of the population of <b>{Area}</b> identifies as Black"
+  ))
+```
+
+Creating the color palette.
+
+```{r}
+my_palette_1 <- colorNumeric(
+  palette = "viridis",
+  domain = black_map_labels$nh_black_pct
+)
+```
+
+Creating the map itself.
+
+```{r}
+leaflet() |> 
+  addProviderTiles("CartoDB.Positron") |> 
+  addPolygons(
+    data = black_map_labels,
+    weight = 0.75,
+    fillColor = ~my_palette_1(nh_black_pct),
+    fillOpacity = 0.8,
+    color = "white",
+    popup = ~text_label
+  ) |> 
+  addLegend(
+    position = "topright",
+    pal = my_palette_1,
+    values = black_map_labels$nh_black_pct,
+    labFormat = labelFormat(
+      transform = function(x) sort(x * 100),
+      suffix = "%"
+    ),
+    opacity = 0.8
+  )
+```
+
+## Population with plant data
+
+### Plant data
+
+Getting the plant map here first.
+
+```{r}
+plants_map <- read_sf("interactive-data/tx-plants-data.geojson")
+
+plants_map
+```
+
+Then making the labels.
+
+```{r}
+plants_map_labels <- plants_map |> 
+  mutate(text_label = str_glue(
+    "{Project} developed by {Company}"
+  ))
+```
+
+### Map
+
+Now making the map.
+
+```{r}
+leaflet() |> 
+   addProviderTiles("CartoDB.Positron") |> 
+  addPolygons(
+    data = black_map_labels,
+    weight = 0.75,
+    fillColor = ~my_palette_1(nh_black_pct),
+    fillOpacity = 0.8,
+    color = "white",
+    popup = ~text_label
+  ) |> 
+  addLegend(
+    position = "topright",
+    pal = my_palette_1,
+    values = black_map_labels$nh_black_pct,
+    labFormat = labelFormat(
+      transform = function(x) sort(x * 100),
+      suffix = "%"
+    ),
+    opacity = 0.8
+  ) |> 
+  addCircleMarkers(
+    data = plants_map_labels,
+    fillColor = "red",
+    stroke = FALSE,
+    radius = 3,
+    fillOpacity = 1,
+    popup = ~text_label
+  ) 
+```

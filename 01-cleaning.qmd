@@ -17,7 +17,7 @@ library(tidycensus)
 library(sf)
 ```
 
-Activating my Census API key.
+Activating my Census API key in case I wanted to use Census data for any of the things I am looking for. 
 
 ```{r}
 census_api_key("460e8dedb542f01b4ea4adede880098417e04166")
@@ -101,7 +101,7 @@ income_cleaned
 
 ## Getting geometry to use for mapping
 
-Getting the data needed to successfully map this. Trial and error.
+Getting the data needed to successfully map this. I found this through [Texas DoT](https://gis-txdot.opendata.arcgis.com/datasets/9b2eb7d232584572ad53bad41c76b04d_0/explore?location=31.119954%2C-100.049436%2C5).
 
 ```{r}
 counties_map <-
@@ -116,11 +116,14 @@ counties_map <-
 counties_map
 ```
 
-```{r}
-tx <- read_sf("mapping-data/Texas_State_Boundary_1106215059088919288.geojson")
 
-tx
-```
+## Joining data
+
+Joining my demographic data with the spatial data I found.
+
+### Race
+
+Starting with race.
 
 ```{r}
 race_counties_joined <- race_pop_cleaned |> 
@@ -129,15 +132,23 @@ race_counties_joined <- race_pop_cleaned |>
 race_counties_joined
 ```
 
+Turning the race joined data into an SF object.
+
 ```{r}
 race_counties_joined |> 
   write_sf("interactive-data/race_counties.geojson")
 ```
 
+### Misc
+
+Turning the counties data into an SF object for a mapping objective I was trying to achieve.
+
 ```{r}
 counties_map |> 
   write_sf("interactive-data/counties_map.geojson")
 ```
+
+### Income
 
 Joining income data with the location data.
 
@@ -147,6 +158,8 @@ income_counties_joined <- income_cleaned |>
 
 income_counties_joined
 ```
+
+Turning into an SF object.
 
 ```{r}
 income_counties_joined |> 
@@ -169,11 +182,13 @@ plant_raw_data
 
 ### Cleaning plant data
 
-Now that it is imported, we can clean it up for the data we want.
+Now that it is imported, we can clean it up for the data I want.
 
 ```{r}
 plant_clean <- plant_raw_data |> 
-  filter(State == "TX") |> 
+  filter(State == "TX",
+         !Latitude == "NA",
+         !Longitude == "NA") |> 
   select(Area,
          Company,
          Project,
@@ -189,7 +204,7 @@ plant_clean <- plant_raw_data |>
 plant_clean
 ```
 
-Note: I noticed that some entries have multiple counties, so I went in Excel and cleaned them there because I wasn't sure how to do this on R. I also removed any projects that did not have assigned counties yet. This could've been easier through OpenRefine, but I forgot to use it.
+Note: I noticed that some entries have multiple counties, so I went and cleaned them in OpenRefine.
 
 ### Export
 
@@ -200,6 +215,8 @@ plant_clean |>
   write_csv("interactive-data/tx-plant-data.csv")
 ```
 
+Also turning it into an rds for an objective I was trying to achieve in mapping.
+
 ```{r}
 plant_clean |> 
   write_rds("interactive-data/tx-plants-data.rds")
@@ -207,8 +224,6 @@ plant_clean |>
 
 
 ### SF object and exporting
-
-Turning the csv file into an sf object and exporting it.
 
 ```{r}
 tx_plant_data <- read_csv("interactive-data/tx-plant-data.csv")
@@ -222,11 +237,101 @@ tx_plant_data_sf <- tx_plant_data |>
   )
 ```
 
-Note: This kept giving me an error, so it meant there were missing coordinates that I did not see. I went back in and manually added the coordinates for whatever I could find. I made a list of projects I did not find, which usually meant they lost funding, do not have a specific location yet and other factors.
-
 Now, I am exporting it.
 
 ```{r}
 tx_plant_data_sf |> write_sf("interactive-data/tx-plants-data.geojson")
 ```
 
+## Exporting as rds
+
+Exporting the race and income data as rds to use in my analysis.
+
+```{r}
+race_pop_cleaned |> 
+  write_rds("demographic-data/tx-race-data.rds")
+```
+
+```{r}
+income_cleaned |> 
+  write_rds("demographic-data/tx-income-data.rds")
+```
+
+## Importing pollution data
+
+Importing and cleaning data I will be using for analysis.
+
+Below are air quality readings sourced from [EPA](https://www.epa.gov/outdoor-air-quality-data/air-quality-index-report
+) for the years 2025, 2015, 2005.
+
+```{r}
+air_pol1 <- read.csv("pol-data/aqireport2025.csv")
+
+air_pol1
+```
+
+```{r}
+air_pol2 <- read.csv("pol-data/aqireport2015.csv")
+```
+
+```{r}
+air_pol3 <- read.csv("pol-data/aqireport2005.csv")
+```
+
+## Cleaning pollution data
+
+There are two things I want to do before filtering and renaming: clean out the ", TX" and make them all caps. I will do that here, then select and rename.
+
+```{r}
+air_pol_25 <- air_pol1 |> 
+  mutate(County = str_remove(County, ", TX"),
+         County = toupper(County)) |> 
+  select(County,
+         AQI.Maximum,
+         AQI.Median) |> 
+  rename("Max_AQI" = "AQI.Maximum",
+         "Median_AQI" = "AQI.Median")
+
+air_pol_25
+```
+
+```{r}
+air_pol_15 <- air_pol2 |> 
+  mutate(County = str_remove(County, ", TX"),
+         County = toupper(County)) |> 
+  select(County,
+         AQI.Maximum,
+         AQI.Median) |> 
+  rename("Max_AQI" = "AQI.Maximum",
+         "Median_AQI" = "AQI.Median")
+
+air_pol_15
+```
+
+```{r}
+air_pol_05 <- air_pol3 |> 
+  mutate(County = toupper(County)) |> 
+  select(County,
+         AQI.Maximum,
+         AQI.Median) |> 
+  rename("Max_AQI" = "AQI.Maximum",
+         "Median_AQI" = "AQI.Median")
+
+air_pol_05
+```
+
+## Exporting pollution data
+
+Exporting it all to use in analysis notebook.
+
+```{r}
+air_pol_25 |> write_rds("pol-data/air_pol_25")
+```
+
+```{r}
+air_pol_15 |> write_rds("pol-data/air_pol_15")
+```
+
+```{r}
+air_pol_05 |> write_rds("pol-data/air_pol_05")
+```
